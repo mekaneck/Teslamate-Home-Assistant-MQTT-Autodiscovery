@@ -36,12 +36,12 @@ script:
           identifiers_override: "" #Default = <base_topic>. Must be a list; e.g. "teslamate/cars/1"
 
       - variables:
-          entity_prefix: "{{ device_name | slugify(separator="_") }}"
+          entity_prefix: "{{ device_name | slugify(separator='_') }}"
           node_id: "{{ base_topic | replace('/','_') | lower }}"
       - variables:
-          model_entity_name: "{{ entity_prefix }}_{{ model_sensor_friendly_name | slugify(separator="_") }}"
-          sw_version_entity_name: "{{ entity_prefix }}_{{ sw_version_sensor_friendly_name | slugify(separator="_") }}"
-          trim_badge_entity_name: "{{ entity_prefix }}_{{ trim_badge_sensor_friendly_name | slugify(separator="_") }}"
+          model_entity_name: "{{ entity_prefix }}_{{ model_sensor_friendly_name | slugify(separator='_') }}"
+          sw_version_entity_name: "{{ entity_prefix }}_{{ sw_version_sensor_friendly_name | slugify(separator='_') }}"
+          trim_badge_entity_name: "{{ entity_prefix }}_{{ trim_badge_sensor_friendly_name | slugify(separator='_') }}"
           
       - if:
           - alias: "If the model sensor doesn't exist in home assistant"

@@ -1,5 +1,5 @@
 ## Teslamate Entity Autodiscovery Scripts
-# v1.0.1 - Utilize slugify filter for entity id's
+# v1.0.2 - Update backend condition to allow execution
 #
 # Instructions: 
 #   1. Edit variables on lines 20-24 per your own setup.
@@ -592,6 +592,7 @@ script:
           sensor_name: Geofence
           icon: mdi:earth
           state_topic_suffix: geofence
+          value_template: value
           device: '{{ device }}'
           discovery_prefix: "{{ discovery_prefix }}"
           base_topic: "{{ base_topic }}"
@@ -837,48 +838,48 @@ script:
     sequence:
       - choose:
           - conditions: >
-              {{ device_name is defined and device_name|length }}
+              {{ (device is defined and device|length) | bool }}
             sequence:
               - service: mqtt.publish
                 data:
                   # https://www.home-assistant.io/integrations/mqtt/#discovery-messages
                   topic_template: "{{ discovery_prefix }}/{{ sensor_type }}/{{ base_topic | replace('/','_') }}/{{ object_id }}/config"
                   retain: true
-                  payload: >
+                  payload: >-
                     {
                       "name": "{{ device_name }} {{ sensor_name }}",
                       "unique_id": "{{ base_topic | replace("/","_") }}_{{ sensor_name | replace("/","_") | replace(" ","_") | lower }}/{{ object_id }}",
-                    {% if device_class is defined and device_class|length %}
-                      "device_class": "{{ device_class }}",
-                    {% endif %}
+                      {% if device_class is defined and device_class|length %}
+                        "device_class": "{{ device_class }}",
+                      {% endif %}
                       "state_topic": "{{ base_topic }}/{{ state_topic_suffix }}",
-                    {% if icon is defined and icon|length %}
-                      "icon": "{{ icon }}",
-                    {% endif %}
-                    {% if state_class is defined and state_class|length %}
-                      "state_class": "{{ state_class }}",
-                    {% endif %}
-                    {% if unit_of_measurement is defined and unit_of_measurement|length %}
-                      "unit_of_measurement": "{{ unit_of_measurement }}",
-                    {% endif %}
-                    {% if value_template is defined and value_template|length %}
-                      "value_template": "{{ '{{' }} {{ value_template }} {{ '}}' }}",
-                    {% endif %}
-                    {% if json_attributes_template is defined and json_attributes_template|length %}
-                      "json_attributes_template": "{{ '{{' }} {{ json_attributes_template }} {{ '}}' }}",
-                    {% endif %}
-                    {% if json_attributes_topic_suffix is defined and json_attributes_topic_suffix|length %}
-                      "json_attributes_topic": "{{ base_topic }}/{{ json_attributes_topic_suffix }}",
-                    {% endif %}
-                    {% if command_topic is defined and command_topic|length %}
-                      "command_topic": "{{ command_topic }}",
-                    {% endif %}
-                    {% if payload_on is defined and payload_on|length %}
-                      "payload_on": "{{ payload_on }}",
-                    {% endif %}
-                    {% if payload_off is defined and payload_off|length %}
-                      "payload_off": "{{ payload_off }}",
-                    {% endif %}
+                      {% if icon is defined and icon|length %}
+                        "icon": "{{ icon }}",
+                      {% endif %}
+                      {% if state_class is defined and state_class|length %}
+                        "state_class": "{{ state_class }}",
+                      {% endif %}
+                      {% if unit_of_measurement is defined and unit_of_measurement|length %}
+                        "unit_of_measurement": "{{ unit_of_measurement }}",
+                      {% endif %}
+                      {% if value_template is defined and value_template|length %}
+                        "value_template": "{{ '{{' }} {{ value_template }} {{ '}}' }}",
+                      {% endif %}
+                      {% if json_attributes_template is defined and json_attributes_template|length %}
+                        "json_attributes_template": "{{ '{{' }} {{ json_attributes_template }} {{ '}}' }}",
+                      {% endif %}
+                      {% if json_attributes_topic_suffix is defined and json_attributes_topic_suffix|length %}
+                        "json_attributes_topic": "{{ base_topic }}/{{ json_attributes_topic_suffix }}",
+                      {% endif %}
+                      {% if command_topic is defined and command_topic|length %}
+                        "command_topic": "{{ command_topic }}",
+                      {% endif %}
+                      {% if payload_on is defined and payload_on|length %}
+                        "payload_on": "{{ payload_on }}",
+                      {% endif %}
+                      {% if payload_off is defined and payload_off|length %}
+                        "payload_off": "{{ payload_off }}",
+                      {% endif %}
                       "device": {{ device }}
                     }
 

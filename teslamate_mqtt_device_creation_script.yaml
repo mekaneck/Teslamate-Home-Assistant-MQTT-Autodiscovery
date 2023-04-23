@@ -824,6 +824,9 @@ script:
           json_attributes_template: '{ \"latitude\": value | float(0), \"longitude\": states(\"sensor.{{ entity_prefix }}_longitude\") | float(0) } | tojson'
           json_attributes_topic_suffix: latitude
           source_type: gps
+          payload_available: "true"
+          payload_not_available: "false"
+          availability_value_template: has_value(\"sensor.{{ entity_prefix }}_longitude\")
           value_template: \"home\" if \"home\" in (states(\"sensor.{{ entity_prefix }}_geofence\") | lower) else \"not_home\"
           device: '{{ device }}'
           discovery_prefix: "{{ discovery_prefix }}"
@@ -849,6 +852,9 @@ script:
                     {
                       "name": "{{ device_name }} {{ sensor_name }}",
                       "unique_id": "{{ base_topic | replace("/","_") }}_{{ sensor_name | replace("/","_") | replace(" ","_") | lower }}/{{ object_id }}",
+                      {% if payload_available is defined and payload_available|length %}
+                        "availability": [{"payload_available": "{{ payload_available }}", "payload_not_available": "{{ payload_not_available }}", "value_template": "{{ '{{' }} {{ availability_value_template }} {{ '}}' }}" }],
+                      {% endif %}
                       {% if device_class is defined and device_class|length %}
                         "device_class": "{{ device_class }}",
                       {% endif %}

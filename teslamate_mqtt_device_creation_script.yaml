@@ -1,5 +1,5 @@
 ## Teslamate Entity Autodiscovery Scripts
-# v1.0.3 - Added availability template to device_tracker.location
+# v1.0.4 - Fix for device_tracker state not updating
 #
 # Instructions: 
 #   1. Edit variables on lines 20-24 per your own setup.
@@ -818,15 +818,13 @@ script:
         data:
           sensor_type: device_tracker
           object_id: location
-          state_topic_suffix: latitude
+          state_topic_suffix: geofence
           sensor_name: Location
           icon: mdi:car
           json_attributes_template: '{ \"latitude\": value | float(0), \"longitude\": states(\"sensor.{{ entity_prefix }}_longitude\") | float(0) } | tojson'
           json_attributes_topic_suffix: latitude
           source_type: gps
-          availability_value_template: \"online\" if (value | float(-500) > -200) else \"offline\"
-          availability_topic_suffix: latitude
-          value_template: \"home\" if \"home\" in (states(\"sensor.{{ entity_prefix }}_geofence\") | lower) else \"not_home\"
+          value_template: \"home\" if value | lower == \"home\"  else \"not_home\"
           device: '{{ device }}'
           discovery_prefix: "{{ discovery_prefix }}"
           base_topic: "{{ base_topic }}"

@@ -22,3 +22,7 @@ A Home Assistant Script to auto-discover MQTT topics populated by the Teslamate 
   7. Create an automation to re-run this script whenever the software version
      sensor is updated. This ensures the correct software version is shown on
      the MQTT device page for each vehicle.
+
+## References:
+Take insipration from the Teslamate documentation regarding the types of sensors you can create:
+https://docs.teslamate.org/docs/integrations/home_assistant/#mqtt_sensorsyaml-mqtt-section-of-configurationyaml

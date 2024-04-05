@@ -380,7 +380,7 @@ script:
                         {{ dict(
                           common.items() | list
                           + repeat.item.config.items() | list
-                          + [("unique_id", base_topic | slugify ~ '_' ~ repeat.item.config.name | slugify ~ '/' ~ repeat.item.config.state_topic)]
+                          + [("unique_id", repeat.item.config.state_topic ~ '//' ~ repeat.item.config.name | slugify)]
                           + [("availability", availability)]
                           ) | to_json
                         }}

@@ -1,887 +1,386 @@
-## Teslamate Entity Autodiscovery Scripts
-# v1.1.0 - Device naming update for HA 2023.8
-#
+## Teslamate Entity Autodiscovery Script
+# v2.0.0 - Complete re-write; inspired by FrnchFrgg: https://community.home-assistant.io/t/why-cant-we-create-custom-devices/472371/14
+# 
 # Instructions: 
-#   1. Edit variables on lines 20-24 per your own setup.
-#   2. Modify, add, or delete any sensors as necessary.
-#   3. Save file into your configuration.yaml, or if you use packages save it 
-#      into the packages folder as a separate yaml file.
-#   4. In Home Assistant, go to developer tools and reload scripts.
-#   5. In Home Assistant, go to scripts and run "Teslamate - Create Entities".
-#   6. (Optional) Create an automation to re-run the script every time the
-#      software version sensor has a state change. This will keep the software
-#      version shown in the device details in-sync with the actual version.   
-
+#  1. Edit line 21 with your discovery prefix
+#  2. Add your vehicle on lines 27-33. If you have multiple cars, make additional list entries.
+#  (Optional:)
+#  3. Modify, add, or remove any sensor starting on line 51. All entries under the "config:" key are documented here:
+#     https://www.home-assistant.io/integrations/sensor.mqtt/#configuration-variables
+#     In order to pass a template, the brackets must be commented out. Use the following example as a reference:
+#     value_template: "{{ '{{' }} value | float(0) * 1.234 {{ '}}' }}"
+#  4. Create an automation to re-run this script whenever the software sensor is updated. This ensures the correct
+#     software version is shown on the MQTT device page for each vehicle.
+#
 script:
-  teslamate_create:
-    alias: 'Teslamate - Create Entities'
+  teslamate_entity_creator:
+    alias: 'Teslamate Entity Creator'
     sequence:
-      - variables:
-          ## Edit These Variables As Needed ##
-          discovery_prefix: homeassistant
-          base_topic: teslamate/cars/1
-          suggested_area: Garage
-          manufacturer: Tesla
-          device_name: Tesla Model 3 #every sensor name and entity ID will begin with this
-          
-          ## Sensor friendly names ##
-          model_sensor_friendly_name: Model Name
-          sw_version_sensor_friendly_name: Software Version
-          trim_badge_sensor_friendly_name: Trim Badge
-          
-          ## Only edit variables below if you know what you are doing ##
-          # If an override is not desired, replace it by two double quotes: ""
-          model_override: "" #Default = Model <Model> <Trim>.
-          sw_version_override: "" #Default = <Version>.
-          identifiers_override: "" #Default = <base_topic>. Must be a list; e.g. "teslamate/cars/1"
-
-      - variables:
-          entity_prefix: "{{ device_name | slugify(separator='_') }}"
-          node_id: "{{ base_topic | replace('/','_') | lower }}"
-      - variables:
-          model_entity_name: "{{ entity_prefix }}_{{ model_sensor_friendly_name | slugify(separator='_') }}"
-          sw_version_entity_name: "{{ entity_prefix }}_{{ sw_version_sensor_friendly_name | slugify(separator='_') }}"
-          trim_badge_entity_name: "{{ entity_prefix }}_{{ trim_badge_sensor_friendly_name | slugify(separator='_') }}"
-          
-      - if:
-          - alias: "If the model sensor doesn't exist in home assistant"
-            condition: template
-            value_template: "{{ states('sensor.' ~ model_entity_name) == 'unknown' }}"
-        then:
-          - alias: "Create the model sensor"
-            service: mqtt.publish
-            data:
-              topic_template: "{{ discovery_prefix }}/sensor/{{ node_id }}/model/config"
-              retain: true
-              payload: >
-                {
-                  "name": "{{ model_sensor_friendly_name }}",
-                  "unique_id": "{{ base_topic }}/model",
-                  "state_topic": "{{ base_topic }}/model"
-                }
-      - if:
-          - alias: "If the sw_version sensor doesn't exist in home assistant"
-            condition: template
-            value_template: "{{ states('sensor.' ~ sw_version_entity_name) == 'unknown' }}"
-        then:
-          - alias: "Create the sw version sensor"
-            service: mqtt.publish
-            data:
-              topic_template: "{{ discovery_prefix }}/sensor/{{ node_id }}/version/config"
-              retain: true
-              payload: >
-                {
-                  "name": "{{ sw_version_sensor_friendly_name }}",
-                  "unique_id": "{{ base_topic }}/version",
-                  "state_topic": "{{ base_topic }}/version"
-                }
-      - if:
-          - alias: "If the trim badge sensor doesn't exist in home assistant"
-            condition: template
-            value_template: "{{ states('sensor.' ~ trim_badge_entity_name) == 'unknown' }}"
-        then:
-          - alias: "Create the trim badge sensor"
-            service: mqtt.publish
-            data:
-              topic_template: "{{ discovery_prefix }}/sensor/{{ node_id }}/trim_badging/config"
-              retain: true
-              payload: >
-                {
-                  "name": "{{ trim_badge_sensor_friendly_name }}",
-                  "unique_id": "{{ base_topic }}/trim_badging",
-                  "state_topic": "{{ base_topic }}/trim_badging"
-                }
-      - alias: "Wait until the trim sensor has data"
-        wait_template: "{{ states('sensor.' ~ trim_badge_entity_name) != 'unknown' }}"
-        timeout:
-          seconds: 5
-      - alias: "Wait until the model sensor has data"
-        wait_template: "{{ states('sensor.' ~ model_entity_name) != 'unknown' }}"
-        timeout:
-          seconds: 5
-      - alias: "Wait until the sw version sensor has data"
-        wait_template: "{{ states('sensor.' ~ sw_version_entity_name) != 'unknown' }}"
-        timeout:
-          seconds: 5
-      - variables:
-          model: >
-            {% if model_override|length %}
-              {{ model_override }}
-            {% else %}
-              Model {{ states('sensor.' ~ model_entity_name) }} {{ states('sensor.' ~ trim_badge_entity_name) }}
-            {% endif %}
-          sw_version: >
-            {% if sw_version_override|length %}
-              {{ sw_version_override }}
-            {% else %}
-              {{ states('sensor.' ~ sw_version_entity_name) }}
-            {% endif %}
-          identifiers: >
-            {% if identifiers_override|length %}
-              {{ identifiers_override }}
-            {% else %}
-              {{ base_topic }}
-            {% endif %}
-      - variables:
-          device: >
-            {
-              "identifiers": ["{{ identifiers }}"],
-              "name": "{{ device_name }}",
-              "model": "{{ model }}",
-              "manufacturer": "{{ manufacturer }}",
-              "suggested_area": "{{ suggested_area }}",
-              "sw_version": "{{ sw_version }}"
-            }
-
-############ UPDATE SENSORS UTILIZED IN THE DEVICE DETAIL FIRST ############
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: model
-          sensor_name: '{{ model_sensor_friendly_name }}'
-          icon: mdi:earth
-          state_topic_suffix: model
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: version
-          state_topic_suffix: version
-          sensor_name: '{{ sw_version_sensor_friendly_name }}'
-          icon: mdi:numeric
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: trim_badging
-          state_topic_suffix: trim_badging
-          sensor_name: '{{ trim_badge_sensor_friendly_name }}'
-          icon: mdi:numeric
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-
-############ BINARY SENSORS ############
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: charging
-          sensor_name: Charger
-          state_topic_suffix: state
-          device_class: battery_charging
-          value_template: \"ON\" if value == \"charging\" else \"OFF\"
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-        
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: climate
-          sensor_name: Climate
-          state_topic_suffix: is_climate_on
-          device_class: running
-          icon: mdi:fan
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: plug
-          sensor_name: Charge Cable Connected
-          state_topic_suffix: plugged_in
-          device_class: plug
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: preconditioning
-          sensor_name: Preconditioning
-          state_topic_suffix: is_preconditioning
-          device_class: running
-          icon: mdi:fan
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: charge_port
-          sensor_name: Charge Port Door
-          state_topic_suffix: charge_port_door_open
-          device_class: door
-          icon: mdi:ev-plug-tesla
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: doors
-          sensor_name: Doors
-          state_topic_suffix: doors_open
-          device_class: door
-          icon: mdi:car-door
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: frunk
-          sensor_name: Frunk
-          state_topic_suffix: frunk_open
-          device_class: door
-          icon: mdi:car
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: health
-          sensor_name: Health
-          state_topic_suffix: healthy
-          device_class: problem
-          icon: mdi:heart-pulse
-          payload_off: 'true'
-          payload_on: 'false'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: locked
-          sensor_name: Locked
-          state_topic_suffix: locked
-          device_class: lock
-          payload_off: 'true'
-          payload_on: 'false'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: occupied
-          sensor_name: Occupied
-          state_topic_suffix: is_user_present
-          device_class: occupancy
-          icon: mdi:account
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: sentry_mode
-          sensor_name: Sentry Mode
-          state_topic_suffix: sentry_mode
-          icon: mdi:cctv
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: trunk
-          sensor_name: Trunk
-          state_topic_suffix: trunk_open
-          device_class: door
-          icon: mdi:car
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: update
-          sensor_name: Update Available
-          state_topic_suffix: update_available
-          device_class: update
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: binary_sensor
-          object_id: windows
-          sensor_name: Windows Open
-          state_topic_suffix: windows_open
-          icon: mdi:car-door
-          device_class: window
-          payload_off: 'false'
-          payload_on: 'true'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-############ SENSORS ############
-
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: charge_energy_added
-          sensor_name: Charge Energy Added
-          state_topic_suffix: charge_energy_added
-          device_class: energy
-          unit_of_measurement: kWh
-          value_template: value | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: limit
-          sensor_name: Charge Limit
-          state_class: measurement
-          state_topic_suffix: charge_limit_soc
-          icon: mdi:battery-charging-90
-          unit_of_measurement: '%'
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: charger_current
-          sensor_name: Charger Current
-          device_class: current
-          state_topic_suffix: charger_actual_current
-          unit_of_measurement: A
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: charger_power
-          sensor_name: Charger Power
-          device_class: power
-          state_topic_suffix: charger_power
-          unit_of_measurement: kW
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: charger_voltage
-          sensor_name: Charger Voltage
-          device_class: voltage
-          state_topic_suffix: charger_voltage
-          unit_of_measurement: V
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: start_time
-          sensor_name: Scheduled Charging Start Time
-          device_class: timestamp
-          state_topic_suffix: scheduled_charging_start_time
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: since
-          sensor_name: Last Update
-          device_class: timestamp
-          state_topic_suffix: since
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: time_to_charged
-          sensor_name: Time Until Full Charge
-          device_class: duration
-          unit_of_measurement: h
-          icon: mdi:timer
-          state_topic_suffix: time_to_full_charge
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: inside_temp
-          sensor_name: Inside Temperature
-          device_class: temperature
-          state_class: measurement
-          unit_of_measurement: °C
-          state_topic_suffix: inside_temp
-          value_template: value | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: outside_temp
-          sensor_name: Outside Temperature
-          device_class: temperature
-          state_class: measurement
-          unit_of_measurement: °C
-          state_topic_suffix: outside_temp
-          value_template: value | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: elevation
-          sensor_name: Elevation
-          unit_of_measurement: ft
-          icon: mdi:image-filter-hdr
-          state_topic_suffix: elevation
-          value_template: (value | float(0) * 3.280839) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: geofence
-          sensor_name: Geofence
-          icon: mdi:earth
-          state_topic_suffix: geofence
-          value_template: value
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: heading
-          sensor_name: Heading
-          icon: mdi:compass
-          state_topic_suffix: heading
-          unit_of_measurement: "°"
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: latitude
-          state_topic_suffix: latitude
-          sensor_name: Latitude
-          icon: mdi:crosshairs-gps
-          unit_of_measurement: "°"
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: longitude
-          state_topic_suffix: longitude
-          sensor_name: Longitude
-          icon: mdi:crosshairs-gps
-          unit_of_measurement: "°"
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: power
-          state_topic_suffix: power
-          sensor_name: Power
-          device_class: power
-          unit_of_measurement: kW
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: speed
-          state_topic_suffix: speed
-          sensor_name: Speed
-          unit_of_measurement: mph
-          icon: mdi:speedometer
-          value_template: (value | float(0) / 1.609344) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: battery
-          state_topic_suffix: battery_level
-          sensor_name: Battery Level
-          state_class: measurement
-          unit_of_measurement: "%"
-          device_class: battery
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: odometer
-          state_topic_suffix: odometer
-          sensor_name: Odometer
-          state_class: total_increasing
-          unit_of_measurement: mi
-          value_template: (value | float(0) / 1.609344) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: range
-          state_topic_suffix: rated_battery_range_km
-          sensor_name: Battery Range
-          icon: mdi:map-marker-distance
-          state_class: measurement
-          unit_of_measurement: mi
-          value_template: (value | float(0) / 1.609344) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: state
-          state_topic_suffix: state
-          sensor_name: State
-          icon: mdi:car-connected
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: tire_pressure_front_left
-          state_topic_suffix: tpms_pressure_fl
-          sensor_name: Tire Pressure (Front Left)
-          icon: mdi:car-tire-alert
-          state_class: measurement
-          device_class: pressure
-          unit_of_measurement: psi
-          value_template: (value | float(0) * 14.503773) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: tire_pressure_front_right
-          state_topic_suffix: tpms_pressure_fr
-          sensor_name: Tire Pressure (Front Right)
-          icon: mdi:car-tire-alert
-          state_class: measurement
-          device_class: pressure
-          unit_of_measurement: psi
-          value_template: (value | float(0) * 14.503773) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: tire_pressure_rear_left
-          state_topic_suffix: tpms_pressure_rl
-          sensor_name: Tire Pressure (Rear Left)
-          icon: mdi:car-tire-alert
-          state_class: measurement
-          device_class: pressure
-          unit_of_measurement: psi
-          value_template: (value | float(0) * 14.503773) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-      - service: script.teslamate_backend
-        data:
-          sensor_type: sensor
-          object_id: tire_pressure_rear_right
-          state_topic_suffix: tpms_pressure_rr
-          sensor_name: Tire Pressure (Rear Right)
-          icon: mdi:car-tire-alert
-          state_class: measurement
-          device_class: pressure
-          unit_of_measurement: psi
-          value_template: (value | float(0) * 14.503773) | round(1)
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-
-
-############ DEVICE TRACKER ############
-      - service: script.teslamate_backend
-        data:
-          sensor_type: device_tracker
-          object_id: location
-          state_topic_suffix: geofence
-          sensor_name: Location
-          icon: mdi:car
-          json_attributes_template: '{ \"latitude\": value | float(0), \"longitude\": states(\"sensor.{{ entity_prefix }}_longitude\") | float(0) } | tojson'
-          json_attributes_topic_suffix: latitude
-          source_type: gps
-          value_template: \"home\" if value | lower == \"home\"  else \"not_home\"
-          device: '{{ device }}'
-          discovery_prefix: "{{ discovery_prefix }}"
-          base_topic: "{{ base_topic }}"
-          suggested_area: "{{ suggested_area }}"
-          manufacturer: "{{ manufacturer }}"
-          device_name: "{{ device_name }}"
-
-  teslamate_backend:
-    alias: "Teslamate - Backend (Don't call direct)"
-    mode: queued
-    sequence:
-      - choose:
-          - conditions: >
-              {{ (device is defined and device|length) | bool }}
-            sequence:
-              - service: mqtt.publish
-                data:
-                  # https://www.home-assistant.io/integrations/mqtt/#discovery-messages
-                  topic_template: "{{ discovery_prefix }}/{{ sensor_type }}/{{ base_topic | replace('/','_') }}/{{ object_id }}/config"
-                  retain: true
-                  payload: >-
-                    {
-                      "name": "{{ sensor_name }}",
-                      "unique_id": "{{ base_topic | replace("/","_") }}_{{ sensor_name | replace("/","_") | replace(" ","_") | lower }}/{{ object_id }}",
-                      {% if availability_value_template is defined and availability_value_template|length %}
-                        "availability": [{ "topic": "{{ base_topic }}/{{ availability_topic_suffix }}", "value_template": "{{ '{{' }} {{ availability_value_template }} {{ '}}' }}" }],
-                      {% endif %}
-                      {% if device_class is defined and device_class|length %}
-                        "device_class": "{{ device_class }}",
-                      {% endif %}
-                      "state_topic": "{{ base_topic }}/{{ state_topic_suffix }}",
-                      {% if icon is defined and icon|length %}
-                        "icon": "{{ icon }}",
-                      {% endif %}
-                      {% if state_class is defined and state_class|length %}
-                        "state_class": "{{ state_class }}",
-                      {% endif %}
-                      {% if unit_of_measurement is defined and unit_of_measurement|length %}
-                        "unit_of_measurement": "{{ unit_of_measurement }}",
-                      {% endif %}
-                      {% if value_template is defined and value_template|length %}
-                        "value_template": "{{ '{{' }} {{ value_template }} {{ '}}' }}",
-                      {% endif %}
-                      {% if json_attributes_template is defined and json_attributes_template|length %}
-                        "json_attributes_template": "{{ '{{' }} {{ json_attributes_template }} {{ '}}' }}",
-                      {% endif %}
-                      {% if json_attributes_topic_suffix is defined and json_attributes_topic_suffix|length %}
-                        "json_attributes_topic": "{{ base_topic }}/{{ json_attributes_topic_suffix }}",
-                      {% endif %}
-                      {% if command_topic is defined and command_topic|length %}
-                        "command_topic": "{{ command_topic }}",
-                      {% endif %}
-                      {% if payload_on is defined and payload_on|length %}
-                        "payload_on": "{{ payload_on }}",
-                      {% endif %}
-                      {% if payload_off is defined and payload_off|length %}
-                        "payload_off": "{{ payload_off }}",
-                      {% endif %}
-                      "device": {{ device }}
-                    }
+      - variables: 
+          #Change this to your mqtt discovery prefix. This will be "homeassistant" unless you changed it in your HA config.
+          discovery_prefix: homeassistant 
+      - repeat:
+          for_each:
+            ## Add each car as a list here with the device_name, base_topic, and device parameters. The device_name and base_topic must be unique. 
+            # Under the 'device:' key, enter any parameters desired except name, model, sw_version, and identifiers. Those will be created automatically.
+            # List of available parameters here: https://www.home-assistant.io/integrations/sensor.mqtt/#device
+            - device_name: Tesla Model 3
+              base_topic: teslamate/cars/1
+              device:
+                manufacturer: Tesla
+                suggested_area: Garage
+                configuration_url: https://teslamate.mekaneck.net
+                serial_number: 5YJ3E1EC7PF500787
+          sequence:
+            - variables:
+                base_topic: "{{ repeat.item.base_topic }}"
+                common: >
+                  {{ dict(
+                    [("device", dict(
+                      repeat.item.device.items() | list
+                      + [("identifiers", [repeat.item.base_topic])]
+                      + [("name", repeat.item.device_name)])
+                      )]
+                    )
+                  }}
+                model_sensor_entity_id: "{{ 'sensor.' ~ common.device.name | slugify ~ '_model' }}"
+                trim_badge_sensor_entity_id: "{{ 'sensor.' ~ common.device.name | slugify ~ '_trim_badge' }}"
+                software_version_sensor_entity_id: "{{ 'sensor.' ~ common.device.name | slugify ~ '_software_version' }}"
+            - repeat:
+                for_each:
+                  - type: sensor
+                    config:
+                      name: Model
+                      state_topic: "{{ base_topic ~ '/model' }}"
+                      icon: mdi:earth
+                  - type: sensor
+                    config:
+                      name: Software Version
+                      state_topic: "{{ base_topic ~ '/version' }}"
+                      icon: mdi:numeric
+                  - type: sensor
+                    config:                  
+                      name: Trim Badge
+                      state_topic: "{{ base_topic ~ '/trim_badging' }}"
+                      icon: mdi:shield-star-outline
+                  ## Start of Binary Sensors ##
+                  - type: binary_sensor
+                    config:
+                      name: Charger
+                      state_topic: "{{ base_topic ~ '/state' }}"
+                      device_class: battery_charging
+                      value_template: '{{ "{{" }} "ON" if value == "charging" else "OFF" {{ "}}" }}'
+                  - type: binary_sensor
+                    config:
+                      name: Climate
+                      state_topic: "{{ base_topic ~ '/is_climate_on' }}"
+                      device_class: running
+                      icon: mdi:fan
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Charge Cable Connected
+                      state_topic: "{{ base_topic ~ '/plugged_in' }}"
+                      device_class: plug
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Preconditioning
+                      state_topic: "{{ base_topic ~ '/is_preconditioning' }}"
+                      device_class: running
+                      icon: mdi:fan
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Charge Port Door
+                      state_topic: "{{ base_topic ~ '/charge_port_door_open' }}"
+                      device_class: door
+                      icon: mdi:ev-plug-tesla
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Doors
+                      state_topic: "{{ base_topic ~ '/doors_open' }}"
+                      device_class: door
+                      icon: mdi:car-door
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Frunk
+                      state_topic: "{{ base_topic ~ '/frunk_open' }}"
+                      device_class: door
+                      icon: mdi:car
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Health
+                      state_topic: "{{ base_topic ~ '/healthy' }}"
+                      device_class: problem
+                      icon: mdi:heart-pulse
+                      payload_off: 'true'
+                      payload_on: 'false'
+                  - type: binary_sensor
+                    config:
+                      name: Locked
+                      state_topic: "{{ base_topic ~ '/locked' }}"
+                      device_class: lock
+                      payload_off: 'true'
+                      payload_on: 'false'
+                  - type: binary_sensor
+                    config:
+                      name: Occupied
+                      state_topic: "{{ base_topic ~ '/is_user_present' }}"
+                      device_class: occupancy
+                      icon: mdi:account
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Sentry Mode
+                      state_topic: "{{ base_topic ~ '/sentry_mode' }}"
+                      icon: mdi:cctv
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Trunk
+                      state_topic: "{{ base_topic ~ '/trunk_open' }}"
+                      device_class: door
+                      icon: mdi:car
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  - type: binary_sensor
+                    config:
+                      name: Update Available
+                      state_topic: "{{ base_topic ~ '/update_available' }}"
+                      device_class: update
+                      payload_off: 'false'
+                      payload_on: 'true'
+                      icon: mdi:alarm
+                  - type: binary_sensor
+                    config:
+                      name: Windows Open
+                      state_topic: "{{ base_topic ~ '/windows_open' }}"
+                      icon: mdi:car-door
+                      device_class: window
+                      payload_off: 'false'
+                      payload_on: 'true'
+                  ## Start of Sensors ##
+                  - type: sensor
+                    config:
+                      name: Charge Energy Added
+                      state_topic: "{{ base_topic ~ '/charge_energy_added' }}"
+                      device_class: energy
+                      unit_of_measurement: kWh
+                  - type: sensor
+                    config:
+                      name: Charge Limit
+                      state_topic: "{{ base_topic ~ '/charge_limit_soc' }}"
+                      state_class: measurement
+                      icon: mdi:battery-charging-90
+                      unit_of_measurement: '%'
+                  - type: sensor
+                    config:
+                      name: Charger Current
+                      state_topic: "{{ base_topic ~ '/charger_actual_current' }}"
+                      device_class: current
+                      unit_of_measurement: A
+                  - type: sensor
+                    config:
+                      name: Charger Power
+                      state_topic: "{{ base_topic ~ '/charger_power' }}"
+                      device_class: power
+                      unit_of_measurement: kW
+                  - type: sensor
+                    config:
+                      name: Charger Voltage
+                      state_topic: "{{ base_topic ~ '/charger_voltage' }}"
+                      device_class: voltage
+                      unit_of_measurement: V
+                  - type: sensor
+                    config:
+                      name: Scheduled Charging Start Time
+                      state_topic: "{{ base_topic ~ '/scheduled_charging_start_time' }}"
+                      device_class: timestamp
+                  - type: sensor
+                    config:
+                      name: Last Update
+                      state_topic: "{{ base_topic ~ '/since' }}"
+                      device_class: timestamp
+                      icon: mdi:clock-outline
+                  - type: sensor
+                    config:
+                      name: Time Until Full Charge
+                      state_topic: "{{ base_topic ~ '/time_to_full_charge' }}"
+                      device_class: duration
+                      unit_of_measurement: h
+                      icon: mdi:timer
+                  - type: sensor
+                    config:
+                      name: Inside Temperature
+                      state_topic: "{{ base_topic ~ '/inside_temp' }}"
+                      device_class: temperature
+                      state_class: measurement
+                      unit_of_measurement: °C
+                  - type: sensor
+                    config:
+                      name: Outside Temperature
+                      state_topic: "{{ base_topic ~ '/outside_temp' }}"
+                      device_class: temperature
+                      state_class: measurement
+                      unit_of_measurement: °C
+                  - type: sensor
+                    config:
+                      name: Elevation
+                      state_topic: "{{ base_topic ~ '/elevation' }}"
+                      unit_of_measurement: m
+                      device_class: distance
+                      icon: mdi:image-filter-hdr
+                  - type: sensor
+                    config:
+                      name: Geofence
+                      state_topic: "{{ base_topic ~ '/geofence' }}"
+                      icon: mdi:earth
+                  - type: sensor
+                    config:
+                      name: Heading
+                      state_topic: "{{ base_topic ~ '/heading' }}"
+                      icon: mdi:compass
+                      unit_of_measurement: "°"
+                  - type: sensor
+                    config:
+                      name: Latitude
+                      state_topic: "{{ base_topic ~ '/latitude' }}"
+                      icon: mdi:crosshairs-gps
+                      unit_of_measurement: "°"
+                  - type: sensor
+                    config:
+                      name: Longitude
+                      state_topic: "{{ base_topic ~ '/longitude' }}"
+                      icon: mdi:crosshairs-gps
+                      unit_of_measurement: "°"
+                  - type: sensor
+                    config:
+                      name: Power
+                      state_topic: "{{ base_topic ~ '/power' }}"
+                      device_class: power
+                      unit_of_measurement: kW
+                  - type: sensor
+                    config:
+                      name: Speed
+                      state_topic: "{{ base_topic ~ '/speed' }}"
+                      unit_of_measurement: km/h
+                      device_class: speed
+                      icon: mdi:speedometer
+                  - type: sensor
+                    config:
+                      name: Battery Level
+                      state_topic: "{{ base_topic ~ '/battery_level' }}"
+                      state_class: measurement
+                      unit_of_measurement: "%"
+                      device_class: battery
+                  - type: sensor
+                    config:
+                      name: Odometer
+                      state_topic: "{{ base_topic ~ '/odometer' }}"
+                      state_class: total_increasing
+                      device_class: distance
+                      unit_of_measurement: km
+                  - type: sensor
+                    config:
+                      name: Battery Range
+                      state_topic: "{{ base_topic ~ '/rated_battery_range_km' }}"
+                      icon: mdi:map-marker-distance
+                      state_class: measurement
+                      device_class: distance
+                      unit_of_measurement: km
+                  - type: sensor
+                    config:
+                      name: State
+                      state_topic: "{{ base_topic ~ '/state' }}"
+                      icon: mdi:car-connected
+                  - type: sensor
+                    config:
+                      name: Tire Pressure (Front Left)
+                      state_topic: "{{ base_topic ~ '/tpms_pressure_fl' }}"
+                      icon: mdi:car-tire-alert
+                      state_class: measurement
+                      device_class: pressure
+                      unit_of_measurement: bar
+                  - type: sensor
+                    config:
+                      name: Tire Pressure (Front Right)
+                      state_topic: "{{ base_topic ~ '/tpms_pressure_fr' }}"
+                      icon: mdi:car-tire-alert
+                      state_class: measurement
+                      device_class: pressure
+                      unit_of_measurement: bar
+                  - type: sensor
+                    config:
+                      name: Tire Pressure (Rear Left)
+                      state_topic: "{{ base_topic ~ '/tpms_pressure_rl' }}"
+                      icon: mdi:car-tire-alert
+                      state_class: measurement
+                      device_class: pressure
+                      unit_of_measurement: bar
+                  - type: sensor
+                    config:
+                      name: Tire Pressure (Rear Right)
+                      state_topic: "{{ base_topic ~ '/tpms_pressure_rr' }}"
+                      icon: mdi:car-tire-alert
+                      state_class: measurement
+                      device_class: pressure
+                      unit_of_measurement: bar
+                  ## Start of Device Trackers ##
+                  - type: device_tracker
+                    config:
+                      name: Location
+                      state_topic: "{{ base_topic ~ '/geofence' }}"
+                      icon: mdi:car
+                      json_attributes_topic: "{{ base_topic ~ '/location' }}"
+                      source_type: gps
+                      value_template: "{{ '{{' }} 'home' if value | lower == 'home'  else 'not_home' {{ '}}' }}"
+                sequence:
+                  - variables:
+                      availability:
+                        - topic: "{{ base_topic ~ '/healthy' }}"
+                          payload_available: 'true'
+                          payload_not_available: 'false'
+                  - if:
+                      - condition: template
+                        value_template: "{{ repeat.last == true }}"
+                    then:
+                      - wait_template: "{{ has_value(model_sensor_entity_id) and has_value(trim_badge_sensor_entity_id) and has_value(software_version_sensor_entity_id) }}"
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                  - variables:
+                      common: >
+                        {% if not repeat.last %}
+                          {{ common }}
+                        {% else %}
+                          {{ dict(
+                            [("device", dict(
+                              common.device.items() | list
+                              + [("model", 'Model ' ~ states(model_sensor_entity_id) ~ ' ' ~ states(trim_badge_sensor_entity_id) )]
+                              + [("sw_version", states(software_version_sensor_entity_id) )])
+                            )])
+                          }}
+                        {% endif %}
+                  - service: mqtt.publish
+                    data:
+                      topic: >
+                        {{ discovery_prefix }}/{{ repeat.item.type }}/{{ base_topic | slugify }}/{{ repeat.item.config.name | slugify }}/config
+                      payload: >
+                        {{ dict(
+                          common.items() | list
+                          + repeat.item.config.items() | list
+                          + [("unique_id", base_topic | slugify ~ '_' ~ repeat.item.config.name | slugify ~ '/' ~ repeat.item.config.state_topic)]
+                          + [("availability", availability)]
+                          ) | to_json
+                        }}

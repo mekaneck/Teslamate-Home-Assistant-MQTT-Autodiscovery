@@ -384,3 +384,4 @@ script:
                           + [("availability", availability)]
                           ) | to_json
                         }}
+                      retain: true

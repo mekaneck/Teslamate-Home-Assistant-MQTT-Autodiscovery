@@ -347,11 +347,6 @@ script:
                       source_type: gps
                       value_template: "{{ '{{' }} 'home' if value | lower == 'home'  else 'not_home' {{ '}}' }}"
                 sequence:
-                  - variables:
-                      availability:
-                        - topic: "{{ base_topic ~ '/healthy' }}"
-                          payload_available: 'true'
-                          payload_not_available: 'false'
                   - if:
                       - condition: template
                         value_template: "{{ repeat.last == true }}"
@@ -381,7 +376,6 @@ script:
                           common.items() | list
                           + repeat.item.config.items() | list
                           + [("unique_id", repeat.item.config.state_topic ~ '//' ~ repeat.item.config.name | slugify)]
-                          + [("availability", availability)]
                           ) | to_json
                         }}
                       retain: true

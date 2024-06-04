@@ -29,8 +29,8 @@ script:
               device:
                 manufacturer: Tesla
                 suggested_area: Garage
-                configuration_url: https://teslamate.mekaneck.net
-                serial_number: 5YJ3E1EC7PF500787
+                configuration_url: https://teslamate.example.com
+                serial_number: VIN_NUMBER
           sequence:
             - variables:
                 base_topic: "{{ repeat.item.base_topic }}"

@@ -302,6 +302,12 @@ script:
                       unit_of_measurement: km
                   - type: sensor
                     config:
+                      name: Shift State
+                      state_topic: "{{ base_topic ~ '/shift_state' }}"
+                      icon: mdi:car-shift-pattern
+                      value_template: "{{ '{{' }} value if value|default(false) else 'P' {{ '}}' }}"
+                  - type: sensor
+                    config:
                       name: State
                       state_topic: "{{ base_topic ~ '/state' }}"
                       icon: mdi:car-connected
@@ -379,3 +385,4 @@ script:
                           ) | to_json
                         }}
                       retain: true
+

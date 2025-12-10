@@ -1,5 +1,5 @@
 ## Teslamate Entity Autodiscovery Script
-# v2.0.0 - Complete re-write; inspired by FrnchFrgg: https://community.home-assistant.io/t/why-cant-we-create-custom-devices/472371/14
+# v2.0.1 - Added update_version, charger_phases, usable_battery_level, est_battery_range_km, ideal_battery_range_km
 # 
 # Instructions: 
 #  1. Edit line 21 with your discovery prefix
@@ -174,6 +174,11 @@ script:
                   ## Start of Sensors ##
                   - type: sensor
                     config:
+                      name: Update Version
+                      state_topic: "{{ base_topic ~ '/update_version' }}"
+                      icon: mdi:alarm
+                  - type: sensor
+                    config:
                       name: Charge Energy Added
                       state_topic: "{{ base_topic ~ '/charge_energy_added' }}"
                       device_class: energy
@@ -203,6 +208,11 @@ script:
                       state_topic: "{{ base_topic ~ '/charger_voltage' }}"
                       device_class: voltage
                       unit_of_measurement: V
+                  - type: sensor
+                    config:
+                      name: Charger Phases
+                      state_topic: "{{ base_topic ~ '/charger_phases' }}"
+                      icon: mdi:sine-wave
                   - type: sensor
                     config:
                       name: Scheduled Charging Start Time
@@ -287,11 +297,19 @@ script:
                       device_class: battery
                   - type: sensor
                     config:
+                      name: Usable Battery Level
+                      state_topic: "{{ base_topic ~ '/usable_battery_level' }}"
+                      state_class: measurement
+                      unit_of_measurement: "%"
+                      device_class: battery
+                  - type: sensor
+                    config:
                       name: Odometer
                       state_topic: "{{ base_topic ~ '/odometer' }}"
                       state_class: total_increasing
                       device_class: distance
                       unit_of_measurement: km
+                      icon: mdi:counter
                   - type: sensor
                     config:
                       name: Battery Range
@@ -300,6 +318,22 @@ script:
                       state_class: measurement
                       device_class: distance
                       unit_of_measurement: km
+                  - type: sensor
+                    config:
+                      name: Estimated Battery Range
+                      state_topic: "{{ base_topic ~ '/est_battery_range_km' }}"
+                      icon: mdi:map-marker-distance
+                      state_class: measurement
+                      device_class: distance
+                      unit_of_measurement: km                      
+                  - type: sensor
+                    config:
+                      name: Ideal Battery Range
+                      state_topic: "{{ base_topic ~ '/ideal_battery_range_km' }}"
+                      icon: mdi:map-marker-distance
+                      state_class: measurement
+                      device_class: distance
+                      unit_of_measurement: km 
                   - type: sensor
                     config:
                       name: Shift State
@@ -385,4 +419,5 @@ script:
                           ) | to_json
                         }}
                       retain: true
+
 

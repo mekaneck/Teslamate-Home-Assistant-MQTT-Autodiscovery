@@ -1,5 +1,5 @@
 ## Teslamate Entity Autodiscovery Script
-# v2.0.0 - Complete re-write; inspired by FrnchFrgg: https://community.home-assistant.io/t/why-cant-we-create-custom-devices/472371/14
+# v2.0.1 - Added update_version, charger_phases, usable_battery_level, est_battery_range_km, ideal_battery_range_km
 # 
 # Instructions: 
 #  1. Edit line 21 with your discovery prefix
@@ -309,6 +309,7 @@ script:
                       state_class: total_increasing
                       device_class: distance
                       unit_of_measurement: km
+                      icon: mdi:counter
                   - type: sensor
                     config:
                       name: Battery Range
@@ -418,4 +419,5 @@ script:
                           ) | to_json
                         }}
                       retain: true
+
 

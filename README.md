@@ -1,3 +1,6 @@
+> [!WARNING]
+> This project is archived as of August, 2026. The functionality provided by it is now included in TeslaMate natively starting in 4.1.0.
+
 # Teslamate-Home-Assistant-MQTT-Autodiscovery
 A Home Assistant Script to auto-discover MQTT topics populated by the Teslamate application
 
